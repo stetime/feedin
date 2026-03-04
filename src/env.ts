@@ -2,6 +2,7 @@ import { ZodError, z } from "zod";
 
 const EnvSchema = z.object({
 	NODE_ENV: z.string().default("development"),
+	LOG_LEVEL: z.string().default("debug"),
 	BETTER_AUTH_SECRET: z.string(),
 	BETTER_AUTH_URL: z.url(),
 	DB_HOST: z.string(),
@@ -10,6 +11,7 @@ const EnvSchema = z.object({
 	DB_NAME: z.string(),
 	DB_PORT: z.coerce.number(),
 	DATABASE_URL: z.string(),
+	API_PORT: z.coerce.number().default(3000),
 });
 
 export type EnvSchema = z.infer<typeof EnvSchema>;
