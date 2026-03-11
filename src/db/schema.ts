@@ -39,6 +39,11 @@ export const post = pgTable(
 		createdAt: timestamp("created_at")
 			.$default(() => new Date())
 			.notNull(),
+		enclosureUrl: text("enclosure_url"),
+		enclosureType: text("enclosure_type"),
+		enclosureLength: integer("enclosure_length"),
+		mediaThumbnail: text("media_thumbnail"),
+		mediaContent: text("media_content"),
 	},
 	(t) => [uniqueIndex("post_feed_guid_idx").on(t.feedId, t.guid)],
 );
