@@ -1,13 +1,19 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import {
+	getFeedById,
 	getFeedByUrl,
 	getFeedsByUserId,
 	insertFeed,
 	purgeFeed,
 } from "@/db/queries/feeds";
 import { insertPosts } from "@/db/queries/posts";
-import { addSubscription, getSubscription } from "@/db/queries/subscriptions";
+import {
+	addSubscription,
+	getSubscription,
+	getSubscriptionCount,
+	purgeSubscription,
+} from "@/db/queries/subscriptions";
 import { logger } from "@/lib/logger";
 import { requireAuth } from "@/lib/middleware";
 import { feedSanityCheck, fetchFeed, parse } from "@/lib/rss";
@@ -16,6 +22,10 @@ import type { AppContext } from "@/lib/types";
 export const feeds = new Hono<AppContext>();
 const postFeedSchema = z.object({
 	url: z.url(),
+});
+
+const feedParamSchema = z.object({
+	id: z.uuid(),
 });
 
 feeds.get("/feeds", requireAuth, async (c) => {
@@ -48,7 +58,7 @@ feeds.post("/feeds", requireAuth, async (c) => {
 	}
 	const remoteFeed = await fetchFeed(url);
 	if (!remoteFeed) return c.json({ error: "could not fetch feed" }, 400);
-	const { xml } = remoteFeed;
+	const { xml, finalUrl } = remoteFeed;
 	if (!feedSanityCheck(xml))
 		return c.json({ error: "not a valid rss/atom feed" }, 400);
 	const parsed = parse(xml);
@@ -56,7 +66,7 @@ feeds.post("/feeds", requireAuth, async (c) => {
 		`parsed ${url} as ${parsed.title}, attempting to insert into the database`,
 	);
 	const insertedFeed = await insertFeed({
-		url,
+		url: finalUrl,
 		title: parsed.title ?? (parsed.link as string),
 		description: parsed.description,
 		etag: remoteFeed.etag ?? undefined,
@@ -69,11 +79,19 @@ feeds.post("/feeds", requireAuth, async (c) => {
 });
 
 feeds.delete("/feeds/:id", requireAuth, async (c) => {
-	const user = c.get("user")
-	if (!user) return c.json({error: "not authorised"}, 403)
-	
-	// confirm the feed exists
-	// if it's a multi sub, just remove the current user's sub
-	// if there's only one user subbed, delete the whole thing
-	await purgeFeed(c.req.param("id"));
+	const user = c.get("user");
+	if (!user) return c.json({ error: "not authorised" }, 403);
+	const param = feedParamSchema.safeParse({ id: c.req.param("id") });
+	if (!param.success) return c.json({ error: "invalid feed id" }, 400);
+	const feedId = param.data.id;
+	if (!(await getFeedById(feedId)))
+		return c.json({ error: "no such feed" }, 404);
+	if (!(await getSubscription(user.id, feedId)))
+		return c.json({ error: "not subscribed to this feed" }, 401);
+	if ((await getSubscriptionCount(feedId)) > 1) {
+		await purgeSubscription(user.id, feedId);
+		return c.json({ success: true });
+	}
+	await purgeFeed(feedId);
+	return c.json({ success: true });
 });
