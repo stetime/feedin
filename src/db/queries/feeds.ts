@@ -1,10 +1,12 @@
 import { eq } from "drizzle-orm";
+import { logger } from "@/lib/logger";
 import { db } from "../index";
 import { feed, subscription } from "../schema";
 
 export async function getFeedsByUserId(userId: string) {
 	return db
 		.select({
+			feedId: feed.id,
 			title: feed.title,
 			url: feed.url,
 			description: feed.description,
@@ -16,7 +18,13 @@ export async function getFeedsByUserId(userId: string) {
 }
 
 export async function getFeedByUrl(url: string) {
+	logger.debug(`querying the db for the url: ${url}`);
 	return db.query.feed.findFirst({ where: eq(feed.url, url) });
+}
+
+export async function getFeedById(id: string) {
+	logger.debug(`querying the db for a feed with id: ${id}`);
+	return db.query.feed.findFirst({ where: eq(feed.id, id) });
 }
 
 export async function insertFeed(values: typeof feed.$inferInsert) {
