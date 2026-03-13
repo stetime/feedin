@@ -51,19 +51,22 @@ export async function getPostsByFeedId(feedId: string) {
 
 export async function insertPosts(feedId: string, entries: FeedEntry[]) {
 	if (!entries.length) return;
-	await db.insert(post).values(
-		entries.map((entry) => ({
-			feedId,
-			guid: entry.id ?? entry.link ?? crypto.randomUUID(),
-			title: entry.title,
-			url: entry.link,
-			content: entry.description ?? null,
-			publishedAt: entry.published ? new Date(entry.published) : null,
-			enclosureUrl: entry.enclosure?.url ?? null,
-			enclosureType: entry.enclosure?.type ?? null,
-			enclosureLength: entry.enclosure?.length ?? null,
-			mediaThumbnail: entry.media?.thumbnail ?? null,
-			mediaContent: entry.media?.content ?? null,
-		})),
-	);
+	await db
+		.insert(post)
+		.values(
+			entries.map((entry) => ({
+				feedId,
+				guid: entry.id ?? entry.link ?? crypto.randomUUID(),
+				title: entry.title,
+				url: entry.link,
+				content: entry.description ?? null,
+				publishedAt: entry.published ? new Date(entry.published) : null,
+				enclosureUrl: entry.enclosure?.url ?? null,
+				enclosureType: entry.enclosure?.type ?? null,
+				enclosureLength: entry.enclosure?.length ?? null,
+				mediaThumbnail: entry.media?.thumbnail ?? null,
+				mediaContent: entry.media?.content ?? null,
+			})),
+		)
+		.onConflictDoNothing();
 }
