@@ -36,3 +36,18 @@ export async function purgeFeed(id: string) {
 	const [result] = await db.delete(feed).where(eq(feed.id, id)).returning();
 	return result;
 }
+
+export async function updateFeedMeta(
+	feedId: string,
+	etag: string | null,
+	lastModified: string | null,
+) {
+	await db
+		.update(feed)
+		.set({
+			etag,
+			lastModified,
+			lastFetched: new Date(),
+		})
+		.where(eq(feed.id, feedId));
+}
