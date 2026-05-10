@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { db } from "../index";
 import { subscription } from "../schema";
 
@@ -12,10 +12,11 @@ export async function getSubscription(userId: string, feedId: string) {
 }
 
 export async function getSubscriptionCount(feedId: string) {
-	const subs = await db.query.subscription.findMany({
-		where: eq(subscription.feedId, feedId),
-	});
-	return subs.length;
+	const subs = await db
+		.select({ count: count() })
+		.from(subscription)
+		.where(eq(subscription.feedId, feedId));
+	return subs[0]?.count ?? 0;
 }
 
 export async function addSubscription(userId: string, feedId: string) {

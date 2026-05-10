@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { db } from "@/db";
+import type { AppContext } from "@/lib/types";
 
-export const debug = new Hono();
+export const debug = new Hono<AppContext>();
 
 debug.get("/debug/users", async (c) => {
 	const users = await db.query.user.findMany();

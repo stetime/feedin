@@ -37,7 +37,6 @@ feeds.get("/feeds", requireAuth, async (c) => {
 
 feeds.post("/feeds", requireAuth, async (c) => {
 	const user = c.get("user");
-	if (!user) return c.json({ error: "unauthorized" }, 401);
 	const body: unknown = await c.req.json().catch(() => null);
 	if (!body) return c.json({ error: "invalid or missing request body" }, 400);
 	const validation = postFeedSchema.safeParse(body);
@@ -48,12 +47,14 @@ feeds.post("/feeds", requireAuth, async (c) => {
 	const existingFeed = await getFeedByUrl(url);
 	if (existingFeed) {
 		logger.debug("we hit an existing feed.");
-		const existingSub = await getSubscription(user.id, existingFeed.id);
+		// biome-ignore lint/style/noNonNullAssertion: requireAuth confirms user exists
+		const existingSub = await getSubscription(user!.id, existingFeed.id);
 		if (existingSub) {
 			logger.debug(`existing subscription found for this user and feed`);
 			return c.json({ error: "already subscribed" }, 409);
 		}
-		await addSubscription(user.id, existingFeed.id);
+		// biome-ignore lint/style/noNonNullAssertion: requireAuth confirms user exists
+		await addSubscription(user!.id, existingFeed.id);
 		return c.json(existingFeed, 201);
 	}
 	const remoteFeed = await fetchFeed(url);
@@ -71,25 +72,29 @@ feeds.post("/feeds", requireAuth, async (c) => {
 		description: parsed.description,
 		etag: remoteFeed.etag ?? undefined,
 		lastModified: remoteFeed.lastModified ?? undefined,
+		lastFetched: new Date(),
 	});
 	if (!insertedFeed) return c.json({ error: "failed to insert feed" }, 500);
 	await insertPosts(insertedFeed.id, parsed.entries ?? []);
-	await addSubscription(user.id, insertedFeed.id);
+	// biome-ignore lint/style/noNonNullAssertion: requireAuth confirms user exists
+	await addSubscription(user!.id, insertedFeed.id);
+	// todo: register a job with the message queue
 	return c.json(insertedFeed, 201);
 });
 
 feeds.delete("/feeds/:id", requireAuth, async (c) => {
 	const user = c.get("user");
-	if (!user) return c.json({ error: "not authorised" }, 403);
 	const param = feedParamSchema.safeParse({ id: c.req.param("id") });
 	if (!param.success) return c.json({ error: "invalid feed id" }, 400);
 	const feedId = param.data.id;
 	if (!(await getFeedById(feedId)))
 		return c.json({ error: "no such feed" }, 404);
-	if (!(await getSubscription(user.id, feedId)))
+	// biome-ignore lint/style/noNonNullAssertion: requireAuth confirms user exists
+	if (!(await getSubscription(user!.id, feedId)))
 		return c.json({ error: "not subscribed to this feed" }, 401);
 	if ((await getSubscriptionCount(feedId)) > 1) {
-		await purgeSubscription(user.id, feedId);
+		// biome-ignore lint/style/noNonNullAssertion: requireAuth confirms user exists
+		await purgeSubscription(user!.id, feedId);
 		return c.json({ success: true });
 	}
 	await purgeFeed(feedId);

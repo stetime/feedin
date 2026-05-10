@@ -39,15 +39,19 @@ export async function purgeFeed(id: string) {
 
 export async function updateFeedMeta(
 	feedId: string,
-	etag: string | null,
-	lastModified: string | null,
+	meta?: {
+		etag: string | null;
+		lastModified: string | null;
+		url?: string;
+	},
 ) {
 	await db
 		.update(feed)
 		.set({
-			etag,
-			lastModified,
+			etag: meta?.etag,
+			lastModified: meta?.lastModified,
 			lastFetched: new Date(),
+			...(meta?.url && { url: meta?.url }),
 		})
 		.where(eq(feed.id, feedId));
 }

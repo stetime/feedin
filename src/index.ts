@@ -1,11 +1,11 @@
-import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { db } from "@/db";
+import { pool } from "@/db";
 import env from "@/env";
 import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
-import { feed, post, subscription } from "./db/schema";
+import { debug } from "./routes/debug";
 import { feeds } from "./routes/feeds";
+import { posts } from "./routes/posts";
 
 const app = new Hono<{
 	Variables: {
@@ -30,7 +30,6 @@ app.use("*", async (c, next) => {
 
 app.use("*", async (c, next) => {
 	const session = await auth.api.getSession({ headers: c.req.raw.headers });
-
 	if (!session) {
 		logger.debug("no session");
 		c.set("user", null);
@@ -49,60 +48,19 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => {
 	return auth.handler(c.req.raw);
 });
 
-app.get("/", (c) => c.json({ message: "test" }));
-
-app.get("/api/posts/:id", async (c) => {
-	const id = c.req.param("id");
-	if (!id) {
-		return c.json({ message: "need an id" });
-	}
-	const posts = await db
-		.select()
-		.from(subscription)
-		.innerJoin(feed, eq(subscription.feedId, feed.id))
-		.leftJoin(post, eq(post.feedId, feed.id))
-		.where(eq(subscription.userId, id))
-		.orderBy(desc(post.publishedAt));
-	return c.json(posts);
-});
-
-app.get("/api/posts", async (c) => {
-	const user = c.get("user");
-	if (!user) return c.body("go away", 401);
-	const posts = await db
-		.select()
-		.from(subscription)
-		.innerJoin(feed, eq(subscription.feedId, feed.id))
-		.leftJoin(post, eq(post.feedId, feed.id))
-		.where(eq(subscription.userId, user.id));
-	return c.json(posts);
-});
-
-// app.get("/api/feeds", async (c) => {
-// 	const user = c.get("user");
-// 	if (!user) return c.body("no mate no", 401);
-// 	const feeds = await db
-// 		.select()
-// 		.from(subscription)
-// 		.innerJoin(feed, eq(subscription.feedId, feed.id))
-// 		.where(eq(subscription.userId, user.id));
-// 	return c.json(feeds);
-// });
-
-app.get("/test", async (c) => {
-	const session = c.get("session");
-	const user = c.get("user");
-	if (!user) return c.body("no auth piss off", 401);
-	logger.debug(user);
-	return c.json({
-		session,
-		user,
-	});
-});
-
 app.route("/", feeds);
+app.route("/", posts);
+
+env.ENABLE_DEBUG_ROUTES && app.route("/", debug);
 
 export default {
 	port: env.API_PORT,
 	fetch: app.fetch,
 };
+
+process.once("SIGINT", async () => {
+	logger.debug("caught sigint, quitting");
+	await pool.end();
+	logger.debug("database connection closed");
+	process.exit(0);
+});

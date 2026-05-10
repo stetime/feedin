@@ -12,6 +12,10 @@ const EnvSchema = z.object({
 	DB_PORT: z.coerce.number(),
 	DATABASE_URL: z.string(),
 	API_PORT: z.coerce.number().default(3000),
+	ENABLE_DEBUG_ROUTES: z
+		.string()
+		.transform((v) => v === "true")
+		.default(false),
 });
 
 export type EnvSchema = z.infer<typeof EnvSchema>;

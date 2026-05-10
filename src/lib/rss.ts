@@ -74,9 +74,8 @@ export async function add(url: string) {
 			throw new Error(`status ${res.status} - couldnt fetch ${url}`);
 		}
 		logger.debug("fetch completed");
-		if (res.redirected) {
+		if (res.redirected && res.url !== url) {
 			logger.debug(`at some point we got redirected: ${res.url}`);
-			// update the url in the db with res.url
 		}
 		const xml = await res.text();
 		if (!feedSanityCheck(xml)) {
@@ -155,7 +154,7 @@ export function feedSanityCheck(xml: string): boolean {
 	);
 }
 
-async function grabFeed(
+export async function fetchFeed(
 	url: string,
 	headers?: FeedHeaders,
 ): Promise<FetchResult | null> {
